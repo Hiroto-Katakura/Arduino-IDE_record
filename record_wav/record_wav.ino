@@ -11,7 +11,7 @@
 #define CONFIG_I2S_DATA_IN_PIN 34 // I2Sデータ入力のピン番号を34に設定
 
 // マイクの初期化関数
-void InitMic(){
+void InitMic() {
     i2s_config_t i2s_config = {
         .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_PDM), // I2Sの動作モードを設定
         .sample_rate = SAMPLE_RATE, // サンプリングレートを設定
@@ -19,7 +19,7 @@ void InitMic(){
         .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT, // チャンネルフォーマットを設定
         .communication_format = I2S_COMM_FORMAT_I2S, // 通信フォーマットを設定
         .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, // 割り込みの割り当てフラグを設定
-        .dma_buf_count = 4, // DMAバッファの数を設定
+        .dma_buf_count = 8, // DMAバッファの数を設定
         .dma_buf_len = CHUNK // 各DMAバッファの長さを設定
     };
     i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL); // I2Sドライバのインストール
@@ -80,8 +80,8 @@ void writeWavHeader(File f, int sampleRate, int bitsPerSample, int channels, int
 VButton *button;
 
 // ボタンが押されたときのコールバック関数
-void button_callback(char *title, bool use_toggle, bool is_toggled){
-    File f = SD.open("/audio.wav", FILE_WRITE); // SDカードにファイルを開く
+void button_callback(char *title, bool use_toggle, bool is_toggled) {
+    File f = SD.open("/audio_record.wav", FILE_WRITE); // SDカードにファイルを開く
     if (f) {
         int dataSize = SAMPLE_RATE * 2 * PERIOD; // データサイズを計算
         writeWavHeader(f, SAMPLE_RATE, 16, 1, dataSize); // WAVヘッダを書き込む
@@ -90,28 +90,23 @@ void button_callback(char *title, bool use_toggle, bool is_toggled){
         size_t byte_read; // 読み取ったバイト数を格納する変数
 
         // 録音時間に基づいて必要なチャンク数を計算
-        int chunk_max = (int)((SAMPLE_RATE*16*1*PERIOD)/8/CHUNK);
+        int chunk_max = (int)((SAMPLE_RATE * 16 * 1 * PERIOD) / 8 / CHUNK);
 
-        for(int i=0; i < chunk_max; i++){
+        for (int i = 0; i < chunk_max; i++) {
             i2s_read(I2S_NUM_0, buffer, CHUNK, &byte_read, (100 / portTICK_RATE_MS)); // I2Sからデータを読み取る
             Serial.printf("."); // シリアルモニタにドットを表示
-
-            // エンディアン変換
-            for (int j = 0; j < CHUNK; j+=2) {
-                uint8_t temp = buffer[j];
-                buffer[j] = buffer[j + 1];
-                buffer[j + 1] = temp;
-            }
 
             f.write(buffer, CHUNK); // ファイルにバッファの内容を書き込む
         }
         f.close(); // ファイルを閉じる
-    }
+    } 
 }
 
 // 初期設定関数
 void setup() {
-    M5.begin(true, true, true, true); // M5Core2の初期化
+    // スピーカーの初期化を無効にしてM5Core2を初期化
+    M5.begin(true, true, true, true, kMBusModeOutput, false);
+    Serial.begin(115200); // シリアルモニタの初期化
     M5.Lcd.setBrightness(200); // LCDの明るさを設定
     M5.Lcd.fillScreen(WHITE); // LCDを白で塗りつぶす
 
